@@ -177,7 +177,7 @@ if [ -e "tmp.o" ]; then
 		rm -f final.c
 		rm -f tmp.o
 		cd ..
-		rm -f .msfpayload
+		rmdir .msfpayload
 
 		sumx=`sha1sum "$out" | cut -d " " -f1`
 		echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
