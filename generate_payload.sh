@@ -183,12 +183,8 @@ fi
 # Cleanup
 if [ "$1" != "noclean" ]; then
 	echo -e "$tag Cleaning up..."
-	rm -f payload.c
-	rm -f buffer.c
-	rm -f final.c
-	rm -f tmp.o
 	cd ..
-	rmdir --ignore-fail-on-non-empty .msfpayload
+	rm -rf .msfpayload
 else
 	echo -e "$tag noclean flag detected, preserving files in .msfpayload"
 fi
