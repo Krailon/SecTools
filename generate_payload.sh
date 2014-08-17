@@ -180,16 +180,6 @@ else
 	i686-w64-mingw32-gcc final.c -o $out -mwindows -s
 fi
 
-if [ -e "$out" ]; then
-	sumx=`sha1sum "$out" | cut -d " " -f1`
-	echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
-	echo -e "$tag Checksum: \e[0;34m$sumx\e[0m"
-	echo -e "\e[1;35mFinished. Have a nice day. :)\e[0m"
-else
-	echo -e "\e[0;31mFailed to compile payload vector\e[0m"
-	exit 1
-fi
-
 # Cleanup
 if [ "$1" != "noclean" ]; then
 	echo -e "$tag Cleaning up..."
@@ -198,7 +188,17 @@ if [ "$1" != "noclean" ]; then
 	rm -f final.c
 	rm -f tmp.o
 	cd ..
-	rmdir .msfpayload
+	rmdir --ignore-fail-on-non-empty .msfpayload
 else
 	echo -e "$tag noclean flag detected, preserving files in .msfpayload"
+fi
+
+if [ -e "$out" ]; then
+	sumx=`sha1sum "$out" | cut -d " " -f1`
+	echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
+	echo -e "$tag Checksum: \e[0;34m$sumx\e[0m"
+	echo -e "\e[1;35mFinished. Have a nice day. :)\e[0m"
+else
+	echo -e "\e[0;31mFailed to compile payload vector\e[0m"
+	exit 1
 fi
