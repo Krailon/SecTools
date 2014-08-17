@@ -171,13 +171,17 @@ if [ -e "tmp.o" ]; then
 		fi
 
 		# Cleanup
-		echo -e "$tag Cleaning up..."
-		rm -f payload.c
-		rm -f buffer.c
-		rm -f final.c
-		rm -f tmp.o
-		cd ..
-		rmdir .msfpayload
+		if [ "$1" != "noclean" ]; then
+			echo -e "$tag Cleaning up..."
+			rm -f payload.c
+			rm -f buffer.c
+			rm -f final.c
+			rm -f tmp.o
+			cd ..
+			rmdir .msfpayload
+		else
+			echo -e "$tag noclean flag detected, preserving files in .msfpayload"
+		fi
 
 		sumx=`sha1sum "$out" | cut -d " " -f1`
 		echo -e "$tag Payload saved to \e[0;33m$out\e[0m!"
