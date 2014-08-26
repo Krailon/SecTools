@@ -19,6 +19,12 @@ rm -rf $loc
 mkdir $loc
 cd $loc
 
+# msfvenom check
+if [ ! -n "$(which msfvenom)" ]; then
+	echo -e "\e[0;31mError: Failed to find msfvenom. Do you have Metasploit installed?\e[0m"
+	exit 1
+fi
+
 # Get payload
 echo -e "\e[4;35mPayload\e[0m \e[0;36m(empty for https meterpreter)\e[0m: \c"
 read pay
@@ -71,12 +77,6 @@ fpath="$(echo $out | sed 's!\(.*\)/.*!\1!')"
 if [ ! -d "$fpath" ]; then
 	echo -e "\e[0;31mError: Invalid output path.\e[0m"
         exit 1
-fi
-
-# msfvenom check
-if [ ! -n "$(which msfvenom)" ]; then
-	echo -e "\e[0;31mError: Failed to find msfvenom. Do you have Metasploit installed?\e[0m"
-	exit 1
 fi
 
 # Generate payload blob (raw byte buffer to insert into C loader stub) via msfvenom (previously used msfpayload)
